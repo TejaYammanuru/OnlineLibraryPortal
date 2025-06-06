@@ -1,17 +1,20 @@
 package main
 
 import (
-    "OnlineLibraryPortal/database"
-    "OnlineLibraryPortal/routes"
-    "github.com/gin-gonic/gin"
+	"OnlineLibraryPortal/database"
+	"OnlineLibraryPortal/routes"
+
+	"github.com/gin-gonic/gin"
 )
 
 func main() {
-    database.Connect()
 
-    r := gin.Default()
+	database.Connect()
 
-    routes.BookRoutes(r)
+	r := gin.Default()
+	r.Static("/uploads", "./uploads")
 
-    r.Run(":8080")
+	routes.BookRoutes(r)
+
+	r.Run(":8080")
 }

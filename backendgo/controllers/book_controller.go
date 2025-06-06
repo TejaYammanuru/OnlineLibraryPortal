@@ -2,7 +2,9 @@ package controllers
 
 import (
 	"net/http"
-
+	"os"
+	"path/filepath"
+	"strconv"
 	"time"
 
 	"OnlineLibraryPortal/database"
@@ -11,36 +13,61 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// Create a new book
 func CreateBook(c *gin.Context) {
-	var input struct {
-		Title           string `json:"title" binding:"required"`
-		Author          string `json:"author" binding:"required"`
-		PublicationDate string `json:"publication_date" binding:"required"`
-		Genre           string `json:"genre" binding:"required"`
-		TotalCopies     int    `json:"total_copies" binding:"required"`
-		CopiesAvailable int    `json:"copies_available" binding:"required"`
-	}
 
-	if err := c.ShouldBindJSON(&input); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+	title := c.PostForm("title")
+	author := c.PostForm("author")
+	publicationDate := c.PostForm("publication_date")
+	genre := c.PostForm("genre")
+	totalCopiesStr := c.PostForm("total_copies")
+	copiesAvailableStr := c.PostForm("copies_available")
+
+	totalCopies, err := strconv.Atoi(totalCopiesStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid total_copies"})
+		return
+	}
+	copiesAvailable, err := strconv.Atoi(copiesAvailableStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid copies_available"})
 		return
 	}
 
-	// Parse publication date
-	pubDate, err := time.Parse("2006-01-02", input.PublicationDate)
+	pubDate, err := time.Parse("2006-01-02", publicationDate)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid publication_date format. Use YYYY-MM-DD"})
 		return
 	}
 
+	file, err := c.FormFile("image")
+	var imageUrl string
+	if err == nil {
+
+		if err := os.MkdirAll("uploads", os.ModePerm); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Could not create uploads folder"})
+			return
+		}
+
+		filename := filepath.Base(file.Filename)
+		dst := "uploads/" + strconv.FormatInt(time.Now().UnixNano(), 10) + "_" + filename
+
+		if err := c.SaveUploadedFile(file, dst); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save image"})
+			return
+		}
+		imageUrl = "/" + dst
+	} else {
+		imageUrl = ""
+	}
+
 	book := models.Book{
-		Title:           input.Title,
-		Author:          input.Author,
+		Title:           title,
+		Author:          author,
 		PublicationDate: pubDate,
-		Genre:           input.Genre,
-		TotalCopies:     input.TotalCopies,
-		CopiesAvailable: input.CopiesAvailable,
+		Genre:           genre,
+		TotalCopies:     totalCopies,
+		CopiesAvailable: copiesAvailable,
+		ImageURL:        imageUrl,
 	}
 
 	database.DB.Create(&book)
@@ -48,27 +75,22 @@ func CreateBook(c *gin.Context) {
 	c.JSON(http.StatusCreated, book)
 }
 
-// Get all books
 func GetBooks(c *gin.Context) {
 	var books []models.Book
 	database.DB.Find(&books)
 	c.JSON(http.StatusOK, books)
 }
 
-// Get one book by ID
 func GetBook(c *gin.Context) {
 	id := c.Param("id")
 	var book models.Book
-
 	if err := database.DB.First(&book, id).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Book not found"})
 		return
 	}
-
 	c.JSON(http.StatusOK, book)
 }
 
-// Update book by ID
 func UpdateBook(c *gin.Context) {
 	id := c.Param("id")
 	var book models.Book
@@ -78,50 +100,67 @@ func UpdateBook(c *gin.Context) {
 		return
 	}
 
-	var input struct {
-		Title           *string `json:"title"`
-		Author          *string `json:"author"`
-		PublicationDate *string `json:"publication_date"` // expect date as string (e.g. "2023-01-01")
-		Genre           *string `json:"genre"`
-		TotalCopies     *int    `json:"total_copies"`
-		CopiesAvailable *int    `json:"copies_available"`
-	}
+	title := c.PostForm("title")
+	author := c.PostForm("author")
+	publicationDate := c.PostForm("publication_date")
+	genre := c.PostForm("genre")
+	totalCopiesStr := c.PostForm("total_copies")
+	copiesAvailableStr := c.PostForm("copies_available")
 
-	if err := c.ShouldBindJSON(&input); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
+	if title != "" {
+		book.Title = title
 	}
-
-	if input.Title != nil {
-		book.Title = *input.Title
+	if author != "" {
+		book.Author = author
 	}
-	if input.Author != nil {
-		book.Author = *input.Author
-	}
-	if input.PublicationDate != nil {
-		parsedDate, err := time.Parse("2006-01-02", *input.PublicationDate)
+	if publicationDate != "" {
+		pubDate, err := time.Parse("2006-01-02", publicationDate)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid publication_date format. Use YYYY-MM-DD"})
 			return
 		}
-		book.PublicationDate = parsedDate
+		book.PublicationDate = pubDate
 	}
-	if input.Genre != nil {
-		book.Genre = *input.Genre
+	if genre != "" {
+		book.Genre = genre
 	}
-	if input.TotalCopies != nil {
-		book.TotalCopies = *input.TotalCopies
+	if totalCopiesStr != "" {
+		totalCopies, err := strconv.Atoi(totalCopiesStr)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid total_copies"})
+			return
+		}
+		book.TotalCopies = totalCopies
 	}
-	if input.CopiesAvailable != nil {
-		book.CopiesAvailable = *input.CopiesAvailable
+	if copiesAvailableStr != "" {
+		copiesAvailable, err := strconv.Atoi(copiesAvailableStr)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid copies_available"})
+			return
+		}
+		book.CopiesAvailable = copiesAvailable
+	}
+
+	file, err := c.FormFile("image")
+	if err == nil {
+		if err := os.MkdirAll("uploads", os.ModePerm); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Could not create uploads folder"})
+			return
+		}
+		filename := filepath.Base(file.Filename)
+		dst := "uploads/" + strconv.FormatInt(time.Now().UnixNano(), 10) + "_" + filename
+
+		if err := c.SaveUploadedFile(file, dst); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save image"})
+			return
+		}
+		book.ImageURL = "/" + dst
 	}
 
 	database.DB.Save(&book)
-
 	c.JSON(http.StatusOK, book)
 }
 
-// Delete book by ID
 func DeleteBook(c *gin.Context) {
 	id := c.Param("id")
 	var book models.Book
@@ -132,6 +171,5 @@ func DeleteBook(c *gin.Context) {
 	}
 
 	database.DB.Delete(&book)
-
-	c.JSON(http.StatusOK, gin.H{"message": "Book deleted successfully"})
+	c.JSON(http.StatusOK, gin.H{"message": "Book deleted"})
 }

@@ -4,7 +4,7 @@ class Users::RegistrationsController < Devise::RegistrationsController
 
   def create
     build_resource(sign_up_params)
-    authorize resource  # 👈 Pundit authorization
+    authorize resource  # Pundit authorization
 
     if resource.save
       if resource.active_for_authentication?
@@ -30,7 +30,7 @@ class Users::RegistrationsController < Devise::RegistrationsController
 
   def update
     self.resource = User.find(params[:id])
-    authorize resource  # 👈 Pundit authorization
+    authorize resource  #  Pundit authorization
 
     if resource.update(account_update_params)
       render json: {
@@ -47,7 +47,7 @@ class Users::RegistrationsController < Devise::RegistrationsController
 
   def destroy
     self.resource = User.find(params[:id])
-    authorize resource  # 👈 Pundit authorization
+    authorize resource  # Pundit authorization
 
     resource.destroy
     render json: { message: 'Account deleted successfully' }, status: :ok

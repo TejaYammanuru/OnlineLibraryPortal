@@ -7,7 +7,7 @@ class UserPolicy
   end
 
   def create?
-    return record.role == 'member' if current_user.nil? # Guest signup
+    return record.role == 'member' if current_user.nil? 
 
     current_user.admin? && record.role == 'librarian'
   end
