@@ -176,6 +176,8 @@ GEM
       stringio
     puma (6.6.0)
       nio4r (~> 2.0)
+    pundit (2.5.0)
+      activesupport (>= 3.0.0)
     racc (1.8.1)
     rack (3.1.16)
     rack-cors (3.0.0)
@@ -265,6 +267,7 @@ DEPENDENCIES
   jsonapi-serializer
   mysql2 (~> 0.5)
   puma (>= 5.0)
+  pundit
   rack-cors
   rails (~> 7.1.5, >= 7.1.5.1)
   tzinfo-data

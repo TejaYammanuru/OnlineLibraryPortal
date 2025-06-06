@@ -1,11 +1,10 @@
-# frozen_string_literal: true
-
 class Users::RegistrationsController < Devise::RegistrationsController
   respond_to :json
+  before_action :authenticate_user!, only: [:update, :destroy]
 
-  # POST /signup
   def create
     build_resource(sign_up_params)
+    authorize resource  # 👈 Pundit authorization
 
     if resource.save
       if resource.active_for_authentication?
@@ -22,7 +21,6 @@ class Users::RegistrationsController < Devise::RegistrationsController
         }, status: :ok
       end
     else
-      Rails.logger.error("Signup failed: #{resource.errors.full_messages}")
       render json: {
         message: 'User registration failed',
         errors: resource.errors.full_messages
@@ -30,17 +28,16 @@ class Users::RegistrationsController < Devise::RegistrationsController
     end
   end
 
-  
   def update
-    self.resource = resource_class.to_adapter.get!(send(:"current_#{resource_name}").to_key)
-    
+    self.resource = User.find(params[:id])
+    authorize resource  # 👈 Pundit authorization
+
     if resource.update(account_update_params)
       render json: {
         message: 'User updated successfully',
         user: user_response(resource)
       }, status: :ok
     else
-      Rails.logger.error("Update failed: #{resource.errors.full_messages}")
       render json: {
         message: 'User update failed',
         errors: resource.errors.full_messages
@@ -48,20 +45,37 @@ class Users::RegistrationsController < Devise::RegistrationsController
     end
   end
 
-  
   def destroy
-    resource = current_user
+    self.resource = User.find(params[:id])
+    authorize resource  # 👈 Pundit authorization
+
     resource.destroy
     render json: { message: 'Account deleted successfully' }, status: :ok
   end
 
   protected
+
   def user_response(user)
     {
       id: user.id,
       email: user.email,
       name: user.name,
+      role: user.role,
       created_at: user.created_at
     }
+  end
+
+  # Allow role to be passed only if current_user is admin
+  def sign_up_params
+    if current_user&.admin?
+      params.require(:user).permit(:email, :password, :password_confirmation, :name, :role)
+    else
+      params.require(:user).permit(:email, :password, :password_confirmation, :name)
+    end
+  end
+
+
+  def account_update_params
+    params.require(:user).permit(:email, :password, :password_confirmation, :name)
   end
 end
