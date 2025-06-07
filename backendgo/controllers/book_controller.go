@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"fmt"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -13,7 +14,18 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+func isAuthorizedToModify(role int) bool {
+	return role == 1 || role == 2
+}
+
 func CreateBook(c *gin.Context) {
+	userRole := c.GetInt("userRole")
+	fmt.Println("User role from context:", userRole) // debug log
+
+	if !isAuthorizedToModify(userRole) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Permission denied"})
+		return
+	}
 
 	title := c.PostForm("title")
 	author := c.PostForm("author")
@@ -42,7 +54,6 @@ func CreateBook(c *gin.Context) {
 	file, err := c.FormFile("image")
 	var imageUrl string
 	if err == nil {
-
 		if err := os.MkdirAll("uploads", os.ModePerm); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Could not create uploads folder"})
 			return
@@ -76,12 +87,14 @@ func CreateBook(c *gin.Context) {
 }
 
 func GetBooks(c *gin.Context) {
+
 	var books []models.Book
 	database.DB.Find(&books)
 	c.JSON(http.StatusOK, books)
 }
 
 func GetBook(c *gin.Context) {
+	// Everyone can view a single book
 	id := c.Param("id")
 	var book models.Book
 	if err := database.DB.First(&book, id).Error; err != nil {
@@ -92,6 +105,14 @@ func GetBook(c *gin.Context) {
 }
 
 func UpdateBook(c *gin.Context) {
+	userRole := c.GetInt("userRole")
+	fmt.Println("User role from context:", userRole)
+
+	if !isAuthorizedToModify(userRole) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Permission denied"})
+		return
+	}
+
 	id := c.Param("id")
 	var book models.Book
 
@@ -162,6 +183,14 @@ func UpdateBook(c *gin.Context) {
 }
 
 func DeleteBook(c *gin.Context) {
+	userRole := c.GetInt("userRole")
+	fmt.Println("User role from context:", userRole)
+
+	if !isAuthorizedToModify(userRole) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Permission denied"})
+		return
+	}
+
 	id := c.Param("id")
 	var book models.Book
 

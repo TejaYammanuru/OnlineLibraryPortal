@@ -15,6 +15,7 @@ func main() {
 	r.Static("/uploads", "./uploads")
 
 	routes.BookRoutes(r)
+	routes.BorrowRoutes(r)
 
 	r.Run(":8080")
 }

@@ -2,8 +2,8 @@ class ApplicationPolicy
   attr_reader :user, :record
 
   def initialize(user, record)
-    @user = user      # Current logged-in user
-    @record = record  # The model instance being authorized
+    @user = user     
+    @record = record 
   end
 
   def index?

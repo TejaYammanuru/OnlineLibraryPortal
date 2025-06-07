@@ -15,20 +15,20 @@ class UserPolicy
   def update?
     return false unless current_user.present?
 
-    # Admin can update librarians
+    
     return true if current_user.admin? && record.librarian?
 
-    # Members can update themselves
+    
     current_user == record && current_user.member?
   end
 
   def destroy?
     return false unless current_user.present?
 
-    # Admin can delete librarians
+   
     return true if current_user.admin? && record.librarian?
 
-    # Members can delete themselves
+    
     current_user == record && current_user.member?
   end
 end
