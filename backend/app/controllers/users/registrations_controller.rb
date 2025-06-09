@@ -1,14 +1,15 @@
 class Users::RegistrationsController < Devise::RegistrationsController
+  include ActionController::Flash  
+  
   respond_to :json
   skip_before_action :authenticate_scope!, only: [:update]
 
   before_action :authenticate_user!, only: [:update, :destroy]
 
-  
   def create
     Rails.logger.info "Create action started with params: #{sign_up_params.inspect}"
     build_resource(sign_up_params)
-    authorize resource
+    authorize resource 
 
     if resource.save
       Rails.logger.info "User saved successfully: #{resource.inspect}"
@@ -25,7 +26,6 @@ class Users::RegistrationsController < Devise::RegistrationsController
     end
   end
 
-  
   def update
     Rails.logger.info "Update action started by user #{current_user&.id} with params: #{params.inspect}"
 
@@ -61,12 +61,10 @@ class Users::RegistrationsController < Devise::RegistrationsController
     end
   end
 
-  
   def destroy
     Rails.logger.info "Destroy action started by user #{current_user&.id} with params: #{params.inspect}"
 
     if current_user.admin? && params[:id].present?
-      
       target_user = User.find_by(id: params[:id], role: :librarian)
 
       unless target_user
@@ -84,7 +82,6 @@ class Users::RegistrationsController < Devise::RegistrationsController
         render json: { message: 'Failed to delete librarian', errors: target_user.errors.full_messages }, status: :unprocessable_entity
       end
     else
-      
       target_user = current_user
       authorize target_user
 
@@ -100,7 +97,6 @@ class Users::RegistrationsController < Devise::RegistrationsController
 
   private
 
-  
   def sign_up_params
     params.require(:user).permit(:email, :password, :password_confirmation, :name, :role)
   end
@@ -109,7 +105,6 @@ class Users::RegistrationsController < Devise::RegistrationsController
     params.require(:user).permit(:email, :password, :password_confirmation, :name)
   end
 
- 
   def user_response(user)
     return {} unless user.present?
 

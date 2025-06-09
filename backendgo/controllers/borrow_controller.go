@@ -125,7 +125,7 @@ func BorrowingHistory(c *gin.Context) {
 	var records []models.BorrowRecord
 	var err error
 
-	if userRole == 1 {
+	if userRole == 1 || userRole == 2 {
 		fmt.Println("Role is librarian, fetching all records")
 
 		err = database.DB.Preload("Book").
@@ -151,4 +151,32 @@ func BorrowingHistory(c *gin.Context) {
 
 	fmt.Println("Fetched borrow records count:", len(records))
 	c.JSON(http.StatusOK, records)
+}
+
+func GetAllLibrarians(c *gin.Context) {
+	var librarians []models.User
+
+	if err := database.DB.
+		Where("role = ?", 1).
+		Select("id", "name", "email", "jti", "created_at", "updated_at").
+		Find(&librarians).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch librarians"})
+		return
+	}
+
+	c.JSON(http.StatusOK, librarians)
+}
+
+func GetAllMembers(c *gin.Context) {
+	var members []models.User
+
+	if err := database.DB.
+		Where("role = ?", 0).
+		Select("id", "name", "email", "jti", "created_at", "updated_at").
+		Find(&members).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch members"})
+		return
+	}
+
+	c.JSON(http.StatusOK, members)
 }

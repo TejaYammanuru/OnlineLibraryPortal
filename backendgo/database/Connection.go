@@ -21,7 +21,6 @@ func Connect() {
 		log.Fatalf("Could not connect to the database: %v", err)
 	}
 	fmt.Println("Successfully connected to the database")
-
 	DB.AutoMigrate(&models.Book{}, &models.BorrowRecord{})
 
 }

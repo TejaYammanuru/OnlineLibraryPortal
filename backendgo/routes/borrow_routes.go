@@ -14,5 +14,8 @@ func BorrowRoutes(router *gin.Engine) {
 		borrow.POST("/", controllers.BorrowBook)
 		borrow.POST("/return", controllers.ReturnBook)
 		borrow.GET("/history", controllers.BorrowingHistory)
+		borrow.GET("/librarians", controllers.GetAllLibrarians)
+		borrow.GET("/members", controllers.GetAllMembers)
+
 	}
 }
