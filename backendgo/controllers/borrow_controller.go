@@ -3,7 +3,9 @@ package controllers
 import (
 	"OnlineLibraryPortal/database"
 	"OnlineLibraryPortal/models"
+	"context"
 	"fmt"
+	"log"
 	"net/http"
 	"time"
 
@@ -13,6 +15,8 @@ import (
 
 func BorrowBook(c *gin.Context) {
 	userRole := c.MustGet("userRole").(int)
+	userName, _ := c.Get("userName")
+	userEmail, _ := c.Get("userEmail")
 	if userRole != 0 {
 		c.JSON(http.StatusForbidden, gin.H{"error": "Only members can borrow books"})
 		return
@@ -62,10 +66,29 @@ func BorrowBook(c *gin.Context) {
 
 	tx.Commit()
 	c.JSON(http.StatusOK, gin.H{"message": "Book borrowed successfully"})
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	logEntry := map[string]interface{}{
+		"user_id":    userID,
+		"book_id":    req.BookID,
+		"action":     "borrowed",
+		"time":       time.Now(),
+		"book_title": book.Title,
+		"user_name":  userName,
+		"email":      userEmail,
+	}
+
+	if _, err := database.BorrowingLogsCollection.InsertOne(ctx, logEntry); err != nil {
+		log.Printf("Failed to insert borrowing log: %v", err)
+	}
 }
 
 func ReturnBook(c *gin.Context) {
 	userRole := c.MustGet("userRole").(int)
+	userName, _ := c.Get("userName")
+	userEmail, _ := c.Get("userEmail")
 	if userRole != 0 {
 		c.JSON(http.StatusForbidden, gin.H{"error": "Only members can return books"})
 		return
@@ -111,6 +134,28 @@ func ReturnBook(c *gin.Context) {
 
 	tx.Commit()
 	c.JSON(http.StatusOK, gin.H{"message": "Book returned successfully"})
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	var book models.Book
+	if err := database.DB.First(&book, req.BookID).Error; err != nil {
+		log.Printf("Failed to fetch book title for return log: %v", err)
+	}
+
+	logEntry := map[string]interface{}{
+		"user_id":    userID,
+		"book_id":    req.BookID,
+		"book_title": book.Title,
+		"action":     "returned",
+		"time":       time.Now(),
+		"user_name":  userName,
+		"email":      userEmail,
+	}
+
+	if _, err := database.BorrowingLogsCollection.InsertOne(ctx, logEntry); err != nil {
+		log.Printf("Failed to insert return log: %v", err)
+	}
 }
 
 func BorrowingHistory(c *gin.Context) {

@@ -1,116 +1,116 @@
 package middleware
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"net/http"
 	"strings"
 
-	"OnlineLibraryPortal/database"
-	"OnlineLibraryPortal/models"
-
-	"github.com/dgrijalva/jwt-go"
 	"github.com/gin-gonic/gin"
-	"gorm.io/gorm"
 )
 
-var jwtSecret = []byte("Teja")
-
-type CustomClaims struct {
-	jwt.StandardClaims
-	Jti  string `json:"jti"`
-	Role int    `json:"role"`
+type VerifiedUser struct {
+	ID    uint   `json:"id"`
+	Name  string `json:"name"`
+	Email string `json:"email"`
+	Role  string `json:"role"`
 }
 
 func JWTAuthMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		fmt.Println("Middleware start")
+		fmt.Println("[JWTAuthMiddleware] Middleware start")
 
 		authHeader := c.GetHeader("Authorization")
-		fmt.Println("Authorization Header:", authHeader)
-
 		if authHeader == "" {
-			fmt.Println("Authorization header missing")
+			fmt.Println("[JWTAuthMiddleware] Authorization header missing")
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "Authorization header missing"})
 			c.Abort()
 			return
 		}
+		fmt.Println("[JWTAuthMiddleware] Authorization header received:", authHeader)
 
 		parts := strings.SplitN(authHeader, " ", 2)
-		fmt.Println("Auth header parts:", parts)
-
 		if len(parts) != 2 || parts[0] != "Bearer" {
-			fmt.Println("Invalid Authorization header format")
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid Authorization header"})
+			fmt.Println("[JWTAuthMiddleware] Invalid Authorization header format")
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid Authorization header format"})
 			c.Abort()
 			return
 		}
 
-		tokenString := parts[1]
-		fmt.Println("Token string extracted:", tokenString)
+		token := parts[1]
+		fmt.Println("[JWTAuthMiddleware] Extracted token:", token)
 
-		token, err := jwt.ParseWithClaims(tokenString, &CustomClaims{}, func(token *jwt.Token) (interface{}, error) {
-			fmt.Println("Inside key func")
-			return jwtSecret, nil
-		})
-
+		client := &http.Client{}
+		req, err := http.NewRequest("POST", "http://localhost:3001/verify_token", bytes.NewBuffer([]byte{}))
 		if err != nil {
-			fmt.Println("Error parsing token:", err)
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid token"})
+			fmt.Println("[JWTAuthMiddleware] Failed to create request to auth server:", err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create request to auth server"})
+			c.Abort()
+			return
+		}
+		req.Header.Set("Authorization", "Bearer "+token)
+		req.Header.Set("Content-Type", "application/json")
+
+		fmt.Println("[JWTAuthMiddleware] Sending request to auth server")
+		resp, err := client.Do(req)
+		if err != nil {
+			fmt.Println("[JWTAuthMiddleware] Failed to contact auth server:", err)
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Failed to contact auth server"})
+			c.Abort()
+			return
+		}
+		defer resp.Body.Close()
+
+		fmt.Println("[JWTAuthMiddleware] Auth server responded with status:", resp.StatusCode)
+		body, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			fmt.Println("[JWTAuthMiddleware] Failed to read auth server response:", err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to read auth server response"})
 			c.Abort()
 			return
 		}
 
-		if !token.Valid {
-			fmt.Println("Token invalid")
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid token"})
+		if resp.StatusCode != http.StatusOK {
+			fmt.Println("[JWTAuthMiddleware] Token verification failed, auth server response body:", string(body))
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Token verification failed"})
 			c.Abort()
 			return
 		}
 
-		claims, ok := token.Claims.(*CustomClaims)
+		fmt.Println("[JWTAuthMiddleware] Auth server response body:", string(body))
+
+		var user VerifiedUser
+		if err := json.Unmarshal(body, &user); err != nil {
+			fmt.Println("[JWTAuthMiddleware] Invalid response from auth server:", err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Invalid response from auth server"})
+			c.Abort()
+			return
+		}
+
+		roleMap := map[string]int{
+			"member":    0,
+			"librarian": 1,
+			"admin":     2,
+		}
+
+		userRole, ok := roleMap[user.Role]
 		if !ok {
-			fmt.Println("Failed to cast claims")
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid token claims"})
+			fmt.Println("[JWTAuthMiddleware] Unknown role:", user.Role)
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid user role"})
 			c.Abort()
 			return
 		}
 
-		fmt.Println("Claims extracted:", claims)
-		fmt.Println("Subject (userID):", claims.Subject)
-		fmt.Println("JTI:", claims.Jti)
-		fmt.Println("Role:", claims.Role)
+		fmt.Printf("[JWTAuthMiddleware] Verified user: ID=%d, Name=%s, Email=%s, Role=%d\n", user.ID, user.Name, user.Email, userRole)
 
-		var user models.User
-		err = database.DB.Where("id = ? AND jti = ?", claims.Subject, claims.Jti).First(&user).Error
-		if err != nil {
-			if err == gorm.ErrRecordNotFound {
-				fmt.Println("Token revoked or invalid: user not found with matching jti")
-				c.JSON(http.StatusUnauthorized, gin.H{"error": "Token revoked or invalid"})
-				c.Abort()
-				return
-			}
-			fmt.Println("Database error:", err)
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Database error"})
-			c.Abort()
-			return
-		}
+		c.Set("userID", user.ID)
+		c.Set("userRole", userRole)
+		c.Set("userName", user.Name)
+		c.Set("userEmail", user.Email)
 
-		fmt.Println("User found:", user.ID)
-
-		var fuser models.User
-		if err := database.DB.First(&fuser, claims.Subject).Error; err != nil {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "User not found"})
-			c.Abort()
-			return
-		}
-
-		c.Set("userID", fuser.ID)
-		c.Set("userRole", fuser.Role)
-
-		fmt.Println(fuser.ID)
-		fmt.Println(fuser.Role)
-		fmt.Println("Middleware success, passing to next handler")
-
+		fmt.Println("[JWTAuthMiddleware] Middleware success, passing to next handler")
 		c.Next()
 	}
 }

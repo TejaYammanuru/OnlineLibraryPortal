@@ -9,11 +9,13 @@ Rails.application.routes.draw do
     registrations: 'users/registrations'
   }
 
-  
   devise_scope :user do
     put   'signup/:id', to: 'users/registrations#update'
     patch 'signup/:id', to: 'users/registrations#update'
     delete 'signup/:id', to: 'users/registrations#destroy'  
-    delete 'signup', to: 'users/registrations#destroy' 
+    delete 'signup', to: 'users/registrations#destroy'
+
+   
+    post 'verify_token', to: 'users/sessions#verify_token'
   end
 end
