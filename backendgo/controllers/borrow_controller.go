@@ -225,3 +225,48 @@ func GetAllMembers(c *gin.Context) {
 
 	c.JSON(http.StatusOK, members)
 }
+
+func GetAdminDashboard(c *gin.Context) {
+	type DashboardData struct {
+		NumLibrarians        int64 `json:"num_librarians"`
+		NumMembers           int64 `json:"num_members"`
+		TotalCopies          int64 `json:"total_copies"`
+		TotalCopiesAvailable int64 `json:"total_copies_available"`
+	}
+
+	var data DashboardData
+
+	// Count librarians
+	if err := database.DB.Model(&models.User{}).
+		Where("role = ?", 1).
+		Count(&data.NumLibrarians).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to count librarians"})
+		return
+	}
+
+	// Count members
+	if err := database.DB.Model(&models.User{}).
+		Where("role = ?", 0).
+		Count(&data.NumMembers).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to count members"})
+		return
+	}
+
+	// Sum total copies of books
+	if err := database.DB.Model(&models.Book{}).
+		Select("SUM(total_copies)").
+		Scan(&data.TotalCopies).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to sum total copies"})
+		return
+	}
+
+	// Sum available copies of books
+	if err := database.DB.Model(&models.Book{}).
+		Select("SUM(copies_available)").
+		Scan(&data.TotalCopiesAvailable).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to sum available copies"})
+		return
+	}
+
+	c.JSON(http.StatusOK, data)
+}

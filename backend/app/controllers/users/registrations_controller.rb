@@ -1,18 +1,43 @@
 class Users::RegistrationsController < Devise::RegistrationsController
   include ActionController::Flash  
-  
+
   respond_to :json
   skip_before_action :authenticate_scope!, only: [:update]
-
   before_action :authenticate_user!, only: [:update, :destroy]
 
   def create
     Rails.logger.info "Create action started with params: #{sign_up_params.inspect}"
     build_resource(sign_up_params)
-    authorize resource 
+    # authorize resource
 
     if resource.save
       Rails.logger.info "User saved successfully: #{resource.inspect}"
+
+      if current_user&.admin? && resource.librarian?
+        LibrarianLog.create!(
+          action: "create",
+          admin: {
+            id: current_user.id,
+            name: current_user.name,
+            email: current_user.email
+          },
+          librarian: {
+            id: resource.id,
+            name: resource.name,
+            email: resource.email
+          }
+        )
+      elsif resource.member?
+        MemberLog.create!(
+          action: "signup",
+          member: {
+            id: resource.id,
+            name: resource.name,
+            email: resource.email
+          }
+        )
+      end
+
       if resource.active_for_authentication?
         sign_up(resource_name, resource)
         render json: { message: 'User registered successfully', user: user_response(resource) }, status: :created
@@ -40,8 +65,29 @@ class Users::RegistrationsController < Devise::RegistrationsController
 
       authorize target_user
 
+      before_attrs = target_user.slice(:name, :email)
+
       if target_user.update(account_update_params)
         Rails.logger.info "Librarian updated successfully: #{target_user.inspect}"
+
+        after_attrs = target_user.slice(:name, :email)
+
+        LibrarianLog.create!(
+          action: "update",
+          admin: {
+            id: current_user.id,
+            name: current_user.name,
+            email: current_user.email
+          },
+          librarian: {
+            id: target_user.id,
+            name: target_user.name,
+            email: target_user.email
+          },
+          before_update: before_attrs,
+          after_update: after_attrs
+        )
+
         render json: { message: 'Librarian updated successfully', user: user_response(target_user) }, status: :ok
       else
         Rails.logger.info "Update failed for librarian: #{target_user.errors.full_messages}"
@@ -51,8 +97,26 @@ class Users::RegistrationsController < Devise::RegistrationsController
       Rails.logger.info "Member updating self with id: #{current_user.id}"
       authorize current_user
 
+      before_attrs = current_user.slice(:name, :email)
+
       if current_user.update(account_update_params)
         Rails.logger.info "User updated successfully: #{current_user.inspect}"
+
+        after_attrs = current_user.slice(:name, :email)
+
+        if current_user.member?
+          MemberLog.create!(
+            action: "update",
+            member: {
+              id: current_user.id,
+              name: current_user.name,
+              email: current_user.email
+            },
+            before_update: before_attrs,
+            after_update: after_attrs
+          )
+        end
+
         render json: { message: 'User updated successfully', user: user_response(current_user) }, status: :ok
       else
         Rails.logger.info "Update failed for user: #{current_user.errors.full_messages}"
@@ -74,8 +138,21 @@ class Users::RegistrationsController < Devise::RegistrationsController
 
       authorize target_user
 
+      librarian_data = target_user.slice(:id, :name, :email)
+
       if target_user.destroy
         Rails.logger.info "Librarian deleted successfully: #{target_user.inspect}"
+
+        LibrarianLog.create!(
+          action: "delete",
+          admin: {
+            id: current_user.id,
+            name: current_user.name,
+            email: current_user.email
+          },
+          librarian: librarian_data
+        )
+
         render json: { message: 'Librarian deleted successfully' }, status: :ok
       else
         Rails.logger.info "Failed to delete librarian: #{target_user.errors.full_messages}"
@@ -85,8 +162,18 @@ class Users::RegistrationsController < Devise::RegistrationsController
       target_user = current_user
       authorize target_user
 
+      member_data = target_user.slice(:id, :name, :email)
+
       if target_user.destroy
         Rails.logger.info "Account deleted successfully: #{target_user.inspect}"
+
+        if target_user.member?
+          MemberLog.create!(
+            action: "delete",
+            member: member_data
+          )
+        end
+
         render json: { message: 'Account deleted successfully' }, status: :ok
       else
         Rails.logger.info "Failed to delete account: #{target_user.errors.full_messages}"

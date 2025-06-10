@@ -17,5 +17,6 @@ Rails.application.routes.draw do
 
    
     post 'verify_token', to: 'users/sessions#verify_token'
+    get 'profile', to: 'users/sessions#profile'
   end
 end

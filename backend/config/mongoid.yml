@@ -1,0 +1,11 @@
+development:
+  clients:
+    default:
+      uri: mongodb+srv://Teja:12345@cluster0.dzji5ih.mongodb.net/library_portal_logging
+  options: {}
+
+production:
+  clients:
+    default:
+      uri: <%= ENV['MONGODB_URI'] %>
+  options: {}

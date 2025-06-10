@@ -16,6 +16,7 @@ func BorrowRoutes(router *gin.Engine) {
 		borrow.GET("/history", controllers.BorrowingHistory)
 		borrow.GET("/librarians", controllers.GetAllLibrarians)
 		borrow.GET("/members", controllers.GetAllMembers)
+		borrow.GET("/dashboard", controllers.GetAdminDashboard)
 
 	}
 }
