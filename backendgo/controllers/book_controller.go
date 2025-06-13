@@ -24,10 +24,12 @@ func isAuthorizedToModify(role int) bool {
 type BookRequest struct {
 	Title           string `json:"title" binding:"required"`
 	Author          string `json:"author" binding:"required"`
+	Description     string `json:"description"`
 	Genre           string `json:"genre" binding:"required"`
 	PublicationDate string `json:"publication_date"`
 	TotalCopies     int    `json:"total_copies"`
 	CopiesAvailable int    `json:"copies_available"`
+	OverdueDays     int    `json:"overdue_days"`
 	ImageURL        string `json:"image_url"`
 }
 
@@ -50,6 +52,11 @@ func CreateBook(c *gin.Context) {
 	if req.TotalCopies < 0 || req.CopiesAvailable < 0 || req.CopiesAvailable > req.TotalCopies {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid copies values"})
 		return
+	}
+
+	// Validate overdue days
+	if req.OverdueDays <= 0 {
+		req.OverdueDays = 15
 	}
 
 	var pubDate time.Time
@@ -91,10 +98,12 @@ func CreateBook(c *gin.Context) {
 	book := models.Book{
 		Title:           req.Title,
 		Author:          req.Author,
+		Description:     req.Description,
 		PublicationDate: pubDate,
 		Genre:           req.Genre,
 		TotalCopies:     req.TotalCopies,
 		CopiesAvailable: req.CopiesAvailable,
+		OverdueDays:     req.OverdueDays,
 		ImageURL:        imageUrl,
 	}
 
@@ -110,10 +119,12 @@ func CreateBook(c *gin.Context) {
 			"book_id":         book.ID,
 			"title":           book.Title,
 			"author":          book.Author,
+			"description":     book.Description,
 			"genre":           book.Genre,
 			"publicationDate": book.PublicationDate,
 			"totalCopies":     book.TotalCopies,
 			"copiesAvailable": book.CopiesAvailable,
+			"overdueDays":     book.OverdueDays,
 			"imageURL":        book.ImageURL,
 			"userRole":        userRole,
 			"userName":        userName,
@@ -149,6 +160,11 @@ func UpdateBook(c *gin.Context) {
 	if req.TotalCopies < 0 || req.CopiesAvailable < 0 || req.CopiesAvailable > req.TotalCopies {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid copies values"})
 		return
+	}
+
+	// Validate overdue days
+	if req.OverdueDays <= 0 {
+		req.OverdueDays = 15
 	}
 
 	var pubDate time.Time
@@ -195,10 +211,12 @@ func UpdateBook(c *gin.Context) {
 
 	book.Title = req.Title
 	book.Author = req.Author
+	book.Description = req.Description
 	book.Genre = req.Genre
 	book.PublicationDate = pubDate
 	book.TotalCopies = req.TotalCopies
 	book.CopiesAvailable = req.CopiesAvailable
+	book.OverdueDays = req.OverdueDays
 	book.ImageURL = imageUrl
 
 	if err := database.DB.Save(&book).Error; err != nil {
@@ -252,13 +270,15 @@ func DeleteBook(c *gin.Context) {
 	go func() {
 		ctx := context.Background()
 		logEntry := bson.M{
-			"operation": "delete",
-			"book_id":   book.ID,
-			"title":     book.Title,
-			"userRole":  userRole,
-			"userName":  userName,
-			"userEmail": userEmail,
-			"timestamp": time.Now(),
+			"operation":   "delete",
+			"book_id":     book.ID,
+			"title":       book.Title,
+			"description": book.Description,
+			"overdueDays": book.OverdueDays,
+			"userRole":    userRole,
+			"userName":    userName,
+			"userEmail":   userEmail,
+			"timestamp":   time.Now(),
 		}
 		_, err := database.BookLogsCollection.InsertOne(ctx, logEntry)
 		if err != nil {

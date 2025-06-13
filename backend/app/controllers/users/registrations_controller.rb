@@ -8,7 +8,7 @@ class Users::RegistrationsController < Devise::RegistrationsController
   def create
     Rails.logger.info "Create action started with params: #{sign_up_params.inspect}"
     build_resource(sign_up_params)
-    # authorize resource
+    
 
     if resource.save
       Rails.logger.info "User saved successfully: #{resource.inspect}"
@@ -36,6 +36,7 @@ class Users::RegistrationsController < Devise::RegistrationsController
             email: resource.email
           }
         )
+        UserMailer.welcome_email(resource).deliver_later
       end
 
       if resource.active_for_authentication?
@@ -55,11 +56,12 @@ class Users::RegistrationsController < Devise::RegistrationsController
     Rails.logger.info "Update action started by user #{current_user&.id} with params: #{params.inspect}"
 
     if current_user.admin? && params[:id].present?
+    
       Rails.logger.info "Admin updating librarian with id: #{params[:id]}"
       target_user = User.find_by(id: params[:id], role: User.roles[:librarian])
 
       unless target_user
-        Rails.logger.info "Librarian not found with id: #{params[:id]}"
+       Rails.logger.info "Librarian not found with id: #{params[:id]}"
         return render json: { message: 'Librarian not found' }, status: :not_found
       end
 
@@ -75,13 +77,13 @@ class Users::RegistrationsController < Devise::RegistrationsController
         LibrarianLog.create!(
           action: "update",
           admin: {
-            id: current_user.id,
+           id: current_user.id,
             name: current_user.name,
             email: current_user.email
           },
           librarian: {
             id: target_user.id,
-            name: target_user.name,
+           name: target_user.name,
             email: target_user.email
           },
           before_update: before_attrs,
@@ -93,9 +95,19 @@ class Users::RegistrationsController < Devise::RegistrationsController
         Rails.logger.info "Update failed for librarian: #{target_user.errors.full_messages}"
         render json: { message: 'Update failed', errors: target_user.errors.full_messages }, status: :unprocessable_entity
       end
+
     else
+    
       Rails.logger.info "Member updating self with id: #{current_user.id}"
       authorize current_user
+
+    
+      if current_user.member? && params[:user][:password].present?
+        unless current_user.valid_password?(params[:user][:current_password])
+          Rails.logger.warn "Current password incorrect for user #{current_user.id}"
+          return render json: { message: 'Current password is incorrect' }, status: :unauthorized
+        end
+      end
 
       before_attrs = current_user.slice(:name, :email)
 
@@ -124,6 +136,7 @@ class Users::RegistrationsController < Devise::RegistrationsController
       end
     end
   end
+
 
   def destroy
     Rails.logger.info "Destroy action started by user #{current_user&.id} with params: #{params.inspect}"

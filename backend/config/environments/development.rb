@@ -68,10 +68,25 @@ Rails.application.configure do
 
   # Uncomment if you wish to allow Action Cable access from any origin.
   # config.action_cable.disable_request_forgery_protection = true
+ 
 
   # Raise error when a before_action's only/except options reference missing actions
   config.action_controller.raise_on_missing_callback_actions = true
   config.session_store :cookie_store, key: 'Teja'
   config.middleware.use ActionDispatch::Cookies
   config.middleware.use ActionDispatch::Session::CookieStore
+
+  config.action_mailer.delivery_method = :smtp
+  config.action_mailer.smtp_settings = {
+    address:              'smtp.gmail.com',
+    port:                 587,
+    domain:               'google.com',
+    user_name:            'yammanuru.tejaswini@vegrow.in',
+    password:             'ldqkbfsaipsielav', 
+    authentication:       'plain',
+    enable_starttls_auto: true
+  }
+
+
+
 end

@@ -11,8 +11,7 @@ func BorrowRoutes(router *gin.Engine) {
 	borrow := router.Group("/borrow")
 	borrow.Use(middleware.JWTAuthMiddleware())
 	{
-		// borrow.POST("/", controllers.BorrowBook)
-		// borrow.POST("/return", controllers.ReturnBook)
+
 		borrow.GET("/history", controllers.BorrowingHistory)
 		borrow.GET("/librarians", controllers.GetAllLibrarians)
 		borrow.GET("/members", controllers.GetAllMembers)
@@ -24,6 +23,13 @@ func BorrowRoutes(router *gin.Engine) {
 		borrow.POST("/reject", controllers.RejectBorrowRequest)
 		borrow.POST("/returnreq", controllers.ReturnRequest)
 		borrow.POST("/returnack", controllers.AcknowledgeReturn)
+		borrow.GET("/status", controllers.GetMyBorrowRequests)
+		borrow.GET("/not-returned-books", controllers.GetBooksNotYetReturned)
+		borrow.GET("/return-pending", controllers.GetBooksReturnRequestedNotAcknowledged)
+		borrow.GET("/all-return-pending", controllers.GetReturnPendingRecords)
+		borrow.GET("/lib-stats", controllers.GetLibrarianDashboardStats)
+		borrow.GET("/member-notifications", controllers.GetMemberNotifications)
+		borrow.GET("/member-overview", controllers.GetMemberOverview)
 
 	}
 }
